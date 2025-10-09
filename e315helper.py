@@ -35,11 +35,6 @@ class Helper():
         elif platform == "win32":
             logging.debug("Found Windows")
             raise Exception("Windows Not Supported")
-        
-        #check if running on the Pynq
-        if os.path.exists('/dev/uio0'):
-            logging.debug("found /dev/uio0, means Pynq")
-            raise Exception("Running on Pynq not supported.  Run on the host machine.")
 
     def getVersion(self):
         return self.version
@@ -50,7 +45,7 @@ class Helper():
                 return json.load(f)
         else:
             return {"IP": "192.168.2.99", 
-                    "Proj": "Missing_JSON", 
+                    "Proj": "P4_Popcount", 
                     "fpga_design": "bd_fpga",
                     "branch": "master"}
 
@@ -60,9 +55,11 @@ class Helper():
             json.dump( self.J, f) 
 
      
+
     def run_command(self, command):
         print ('running: ', command)
-        result = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stdin=subprocess.PIPE)
+        result = subprocess.Popen(command, shell=True, executable='/bin/bash', \
+                            stdout=subprocess.PIPE, stdin=subprocess.PIPE)
         return result.communicate()
 
     def vivado_build_cleanup(self,):
@@ -152,25 +149,21 @@ class Helper():
                     'git remote remove pynq', 
                     'git remote add pynq xilinx@' + self.J['IP'] + ':~/jupyter_notebooks/' + proj,
                     'GIT_SSH_COMMAND=\'ssh -i '+self.priv_key + '\' git push pynq ' + self.J['branch'], 
-                    ssh + ' "cd ~/jupyter_notebooks/' + proj + ' && git checkout ' + self.J['branch'] + '"'
+                    ssh + ' "cd ~/jupyter_notebooks/' + proj + ' && git checkout ' + self.J['branch'] + '"',
+                    ssh + ' "cd ~/jupyter_notebooks/' + proj + ' && git config receive.denyCurrentBranch" '
                    ]   
         for command in commands:                     
             self.run_command(command)
 
-    def load_bitstream(self, path = ''):
-        if path == '':
-            bit =  self.MY_DIR + '/vivado_project/vivado_project.runs/impl_1/' + self.J['fpga_design'] + '_wrapper.bit'
+    def load_bitstream(self):
+        bit =  self.MY_DIR + '/vivado_project/vivado_project.runs/impl_1/' + self.J['fpga_design'] + '_wrapper.bit'
 
-            hwh = self.MY_DIR + '/vivado_project/vivado_project.gen/sources_1/bd/'+self.J['fpga_design']+'/hw_handoff/' + \
-                                self.J['fpga_design']+'.hwh'
+        hwh = self.MY_DIR + '/vivado_project/vivado_project.gen/sources_1/bd/'+self.J['fpga_design']+'/hw_handoff/' + \
+                            self.J['fpga_design']+'.hwh'
 
-            if not os.path.exists( hwh):
-                logging.info('trying alternate hwh file path')
-                hwh = self.MY_DIR + '/verilog/vsrc/'+ self.J['fpga_design'] + '/hw_handoff/' + self.J['fpga_design'] + '.hwh'
-        else: 
-            assert (os.path.exists(path))
-            bit = path
-            hwh = path.replace('.bit', '.hwh')
+        if not os.path.exists( hwh):
+            logging.info('trying alternate hwh file path')
+            hwh = self.MY_DIR + '/verilog/vsrc/'+ self.J['fpga_design'] + '/hw_handoff/' + self.J['fpga_design'] + '.hwh'
 
         scp = 'scp -i ' + self.priv_key
         pynq = 'xilinx@'+self.J['IP'] + ':~/jupyter_notebooks/' + self.J['Proj'] + '/Pynq/'
@@ -189,8 +182,9 @@ class Helper():
 
         commands = [
                     'git pull origin ' + self.J['branch'], 
-                    ssh + ' "cd ~/jupyter_notebooks/' + proj + ' && git commit -a -m \\"e315helper.py update\\" ' + '"',
                     'GIT_SSH_COMMAND=\'ssh -i '+self.priv_key + '\' git pull pynq ' + self.J['branch'], 
+
+                    ssh + ' "cd ~/jupyter_notebooks/' + proj + ' && git commit -a -m \\"update commit\\" ' + '"',
 
                     ssh + ' "mkdir -p ~/tmp" ',
                     ssh + ' "cd ~/tmp && git init --bare" ',
@@ -204,7 +198,7 @@ class Helper():
         for command in commands:                     
             self.run_command(command)
 
-
+        
     def set_ip(self, IP):
         # https://www.geeksforgeeks.org/python-program-to-validate-an-ip-address/
         regex = '''^(25[0-5]|2[0-4][0-9]|[0-1]?[0-9][0-9]?)\.( 
@@ -258,8 +252,6 @@ class Parser():
 
         bitstream_ap= sap.add_parser('bitstream', help='write the bitstream to the Pynq')
         bitstream_ap.add_argument('--ip', type=str, nargs='?', help="Ip Address of Pynq")
-        bitstream_ap.add_argument('--path', type=str, nargs='?', default='',
-            help="Path to the bitstream") 
 
         update_ap= sap.add_parser('update', help='update from git') 
 
@@ -285,7 +277,7 @@ class Parser():
             print ('No command specified!')
             ap.print_help()
             exit(1)
-
+       
         #jump to the correct command function
         getattr(self, args.command)(args)
 
@@ -323,11 +315,7 @@ class Parser():
         h = Helper()
         if args.ip:
             h.set_ip(args.ip)
-
-        if args.path: path = args.path
-        else: path = ''
-
-        h.load_bitstream( path )
+        h.load_bitstream()
 
     def update(self, args):
         print('Running update')
@@ -352,5 +340,4 @@ class Parser():
 if __name__ == "__main__":
 
     Parser()
-
 
