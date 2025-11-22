@@ -50,6 +50,8 @@ module dot_tb();
     //used to access the FP Solutions table
     bit [31:0] sol_hex;
  
+    reg COMPUTE_FIN;
+
     dot DUT ( 
         .clk, 
         .rst, 
@@ -155,6 +157,9 @@ module dot_tb();
     endtask
 
     task compute();
+
+        COMPUTE_FIN = 'h0;
+
         $display("Sending Input Vector");                
         for (i = 0; i < 3; ++i) begin
             inputs_table_lookup(i, fp_hex);
@@ -183,6 +188,8 @@ module dot_tb();
                     fp_hex, $bitstoshortreal(fp_hex), sol_hex, $bitstoshortreal(sol_hex), mismatch); 
             
         end
+        $display( "Compute done, finish timing" );
+        COMPUTE_FIN = 'h1;
     endtask
     
     task timeit (
@@ -202,6 +209,10 @@ module dot_tb();
                 $fatal(1, "Running too long, check OUTPUT_AXIS?");
         end
                         
+        @(posedge clk);
+        assert(COMPUTE_FIN == 'h1) else
+            $fatal(1, "Timing done before correctness check");
+
     endtask
        
 

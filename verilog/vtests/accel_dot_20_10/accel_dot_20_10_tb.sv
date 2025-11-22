@@ -146,6 +146,8 @@ module accel_dot_20_10_tb();
     //used to access the FP Solutions table
     bit [31:0] sol_hex;
  
+    reg COMPUTE_FIN;
+
     accel_dot #(
         .ROWS(ROWS),
         .COLS(COLS)
@@ -263,6 +265,9 @@ module accel_dot_20_10_tb();
     endtask
 
     task compute();
+         
+        COMPUTE_FIN = 'h0;
+
         $display("Sending Input Vector");                
         for (i = 0; i < ROWS; ++i) begin
             inputs_table_lookup(i, fp_hex);
@@ -294,6 +299,8 @@ module accel_dot_20_10_tb();
             repeat(2) @(negedge clk);
 
         end
+        $display( "Compute done, finish timing" );
+        COMPUTE_FIN = 'h1;
     endtask
 
     task timeit (
@@ -313,6 +320,10 @@ module accel_dot_20_10_tb();
                 $fatal(1, "Running too long, check OUTPUT_AXIS?");
         end
                         
+        @(posedge clk);
+        assert(COMPUTE_FIN == 'h1) else
+            $fatal(1, "Timing done before correctness check");
+
     endtask
     
 

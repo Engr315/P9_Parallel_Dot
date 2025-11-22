@@ -41,6 +41,8 @@ module dot_80_40_tb();
     bit [31:0] fp_hex;
     //used to access the FP Solutions table
     bit [31:0] sol_hex;
+    
+    reg COMPUTE_FIN;
  
     axis_dot_80_40 DUT ( 
         .aclk(clk), 
@@ -181,6 +183,9 @@ module dot_80_40_tb();
     endtask
 
     task compute();
+        
+        COMPUTE_FIN = 'h0;
+    
         $display("Sending Input Vector");                
         for (i = 0; i < ROWS ; ++i) begin
             inputs_table_lookup(i, fp_hex);
@@ -209,6 +214,8 @@ module dot_80_40_tb();
                     fp_hex, $bitstoshortreal(fp_hex), sol_hex, $bitstoshortreal(sol_hex), mismatch); 
             
         end
+        $display( "Compute done, finish timing" );
+        COMPUTE_FIN = 'h1;
     endtask
     
     task timeit (
@@ -227,7 +234,11 @@ module dot_80_40_tb();
             assert (cycles < 44100) else 
                 $fatal(1, "Running too long, check OUTPUT_AXIS?");
         end
-                        
+        
+        @(posedge clk);
+        assert(COMPUTE_FIN == 'h1) else
+            $fatal(1, "Timing done before correctness check");
+
     endtask
        
 

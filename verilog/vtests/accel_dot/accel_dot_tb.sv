@@ -49,6 +49,8 @@ module accel_dot_tb();
     bit [31:0] fp_hex;
     //used to access the FP Solutions table
     bit [31:0] sol_hex;
+    
+    reg COMPUTE_FIN;
  
     accel_dot DUT ( 
         .clk, 
@@ -155,6 +157,9 @@ module accel_dot_tb();
     endtask
 
     task compute();
+    
+        COMPUTE_FIN = 'h0;
+        
         $display("Sending Input Vector");                
         for (i = 0; i < 3; ++i) begin
             inputs_table_lookup(i, fp_hex);
@@ -181,8 +186,11 @@ module accel_dot_tb();
             assert( (mismatch > -0.000001) && (mismatch < +0.000001) ) else
                 $fatal(1, "Bad Test Response %h (%f), Expected %h (%f) mismatch:%f", 
                     fp_hex, $bitstoshortreal(fp_hex), sol_hex, $bitstoshortreal(sol_hex), mismatch); 
+                    
             
         end
+        $display( "Compute done, finish timing" );
+        COMPUTE_FIN = 'h1;
     endtask
     
     task timeit (
@@ -190,6 +198,7 @@ module accel_dot_tb();
         );
         
         cycles = 0;
+
         while ( ! (
             (OUTPUT_AXIS_TREADY === 'h1) && 
             (OUTPUT_AXIS_TVALID === 'h1) && 
@@ -201,6 +210,10 @@ module accel_dot_tb();
             assert (cycles < 4410) else 
                 $fatal(1, "Running too long, check OUTPUT_AXIS?");
         end
+        
+        @(posedge clk);
+        assert(COMPUTE_FIN == 'h1) else
+            $fatal(1, "Timing done before correctness check");
                         
     endtask
        
